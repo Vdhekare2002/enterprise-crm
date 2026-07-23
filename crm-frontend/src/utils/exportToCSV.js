@@ -1,44 +1,47 @@
-export const exportLeadsToCSV = (leads) => {
-  if (!leads || leads.length === 0) {
-    alert("No leads available to export!");
+// src/utils/exportToCSV.js
+
+export const exportLeadsToCSV = (data) => {
+  if (!data || data.length === 0) {
+    alert("Export karne ke liye koi data nahi hai!");
     return;
   }
 
-  // Headers define karein
+  // 1. Table Headers Define Karein
   const headers = [
     "Name",
     "Email",
     "Phone",
+    "Company",
     "Status",
-    "Source",
     "Assigned To",
     "Created Date",
   ];
 
-  // Rows format karein
-  const rows = leads.map((lead) => [
-    `"${lead.name || ""}"`,
-    `"${lead.email || ""}"`,
-    `"${lead.phone || ""}"`,
-    `"${lead.status || "New"}"`,
-    `"${lead.source || "Direct"}"`,
-    `"${lead.assignedTo?.name || "Unassigned"}"`,
-    `"${new Date(lead.createdAt).toLocaleDateString()}"`,
+  // 2. Data Rows Format Karein (Commas handle karne ke liye quotes use kiye hain)
+  const rows = data.map((item) => [
+    `"${item.name || ""}"`,
+    `"${item.email || ""}"`,
+    `"${item.phone || ""}"`,
+    `"${item.company || "N/A"}"`,
+    `"${item.status || "New"}"`,
+    `"${item.assignedTo?.name || "Unassigned"}"`,
+    `"${item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "N/A"}"`,
   ]);
 
-  // Combine headers and rows
+  // 3. Header aur Rows ko CSV String mein combine karein
   const csvContent =
     "data:text/csv;charset=utf-8," +
-    [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
 
-  // File download trigger karein
+  // 4. Download Trigger Karein
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);
   link.setAttribute(
     "download",
-    `CRM_Leads_Report_${new Date().toISOString().slice(0, 10)}.csv`,
+    `CRM_Customers_Report_${new Date().toISOString().slice(0, 10)}.csv`,
   );
+
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import API from "../api/axios";
+import API from "../api/axiosInstance";
 import { exportLeadsToCSV } from "../utils/exportToCSV";
 
 const Dashboard = () => {
