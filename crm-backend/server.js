@@ -26,7 +26,7 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     role: {
       type: String,
-      enum: ["superadmin", "telecaller"],
+      enum: ["superadmin", "manager", "telecaller"],
       default: "superadmin",
     },
     phone: { type: String, default: "" },
@@ -94,13 +94,14 @@ app.post("/api/v1/auth/signup", async (req, res) => {
         .status(400)
         .json({ message: "Name, Email & Password required" });
 
-    const exists = await User.findOne({ email });
+    const cleanEmail = email.toLowerCase().trim();
+    const exists = await User.findOne({ email: cleanEmail });
     if (exists) return res.status(400).json({ message: "User already exists" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await User.create({
       name,
-      email,
+      email: cleanEmail,
       password: hashedPassword,
       role: role || "superadmin",
       phone,
@@ -109,6 +110,7 @@ app.post("/api/v1/auth/signup", async (req, res) => {
     const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, {
       expiresIn: "30d",
     });
+
     res.status(201).json({
       success: true,
       message: "Registered!",
@@ -128,7 +130,12 @@ app.post("/api/v1/auth/signup", async (req, res) => {
 app.post("/api/v1/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password required" });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: cleanEmail });
     if (!user) return res.status(400).json({ message: "User not found" });
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -138,6 +145,7 @@ app.post("/api/v1/auth/login", async (req, res) => {
     const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, {
       expiresIn: "30d",
     });
+
     res.status(200).json({
       success: true,
       message: "Logged in!",
@@ -180,14 +188,42 @@ app.post("/api/v1/customers", protect, async (req, res) => {
       email,
       phone,
       company,
-      status,
+      status: status || "New",
       assignedTo,
     });
+
     res
       .status(201)
       .json({ success: true, message: "Customer Created!", data: customer });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+// 🔥 UPDATE CUSTOMER STATUS ROUTE (PATCH)
+app.patch("/api/v1/customers/:id", protect, async (req, res) => {
+  try {
+    const { status, name, email, phone, company, assignedTo } = req.body;
+
+    const updatedCustomer = await Customer.findByIdAndUpdate(
+      req.params.id,
+      { $set: req.body },
+      { new: true, runValidators: true },
+    ).populate("assignedTo", "name email");
+
+    if (!updatedCustomer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Customer not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Customer updated successfully!",
+      data: updatedCustomer,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
