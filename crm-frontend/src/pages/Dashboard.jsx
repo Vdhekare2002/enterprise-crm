@@ -29,6 +29,7 @@ const Dashboard = () => {
     phone: "",
     company: "",
     status: "New",
+    assignedTo: "",
   });
 
   useEffect(() => {
@@ -67,14 +68,25 @@ const Dashboard = () => {
   // Quick Status Change
   const handleStatusChange = async (customerId, newStatus) => {
     try {
-      await API.patch(`/customers/${customerId}`, { status: newStatus });
+      const cleanId = String(customerId).split(":")[0].trim();
+      const res = await API.patch(`/customers/${cleanId}`, {
+        status: newStatus,
+      });
+
       setCustomers((prev) =>
         prev.map((item) =>
-          item._id === customerId ? { ...item, status: newStatus } : item,
+          item._id === customerId
+            ? {
+                ...item,
+                status: newStatus,
+                assignedTo: res.data.data?.assignedTo || item.assignedTo,
+              }
+            : item,
         ),
       );
     } catch (error) {
       console.error("Update error:", error);
+      alert(error.response?.data?.message || "Failed to update status");
     }
   };
 
@@ -82,7 +94,11 @@ const Dashboard = () => {
   const handleAddCustomerSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await API.post("/customers", formData);
+      const payload = {
+        ...formData,
+        assignedTo: formData.assignedTo || null,
+      };
+      const res = await API.post("/customers", payload);
       setCustomers([res.data.data, ...customers]);
       setIsAddModalOpen(false);
       setFormData({
@@ -91,17 +107,25 @@ const Dashboard = () => {
         phone: "",
         company: "",
         status: "New",
+        assignedTo: "",
       });
     } catch (error) {
       alert(error.response?.data?.message || "Failed to add customer");
     }
   };
 
-  // Edit Customer Submit
+  // 🔥 Single Clean Declaration of Edit Customer Submit
   const handleEditCustomerSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await API.patch(`/customers/${editCustomer._id}`, formData);
+      const cleanId = String(editCustomer._id).split(":")[0].trim();
+      const payload = {
+        ...formData,
+        assignedTo: formData.assignedTo || null,
+      };
+
+      const res = await API.patch(`/customers/${cleanId}`, payload);
+
       setCustomers((prev) =>
         prev.map((item) =>
           item._id === editCustomer._id ? res.data.data : item,
@@ -110,6 +134,7 @@ const Dashboard = () => {
       setIsEditModalOpen(false);
       setEditCustomer(null);
     } catch (error) {
+      console.error("Edit error:", error);
       alert(error.response?.data?.message || "Failed to update customer");
     }
   };
@@ -119,7 +144,8 @@ const Dashboard = () => {
     if (!window.confirm("Are you sure you want to delete this customer?"))
       return;
     try {
-      await API.delete(`/customers/${id}`);
+      const cleanId = String(id).split(":")[0].trim();
+      await API.delete(`/customers/${cleanId}`);
       setCustomers((prev) => prev.filter((item) => item._id !== id));
     } catch (error) {
       alert("Failed to delete customer");
@@ -134,6 +160,7 @@ const Dashboard = () => {
       phone: customer.phone || "",
       company: customer.company || "",
       status: customer.status || "New",
+      assignedTo: customer.assignedTo?._id || customer.assignedTo || "",
     });
     setIsEditModalOpen(true);
   };
@@ -209,7 +236,6 @@ const Dashboard = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Add Customer Button */}
             <button
               onClick={() => {
                 setFormData({
@@ -218,6 +244,7 @@ const Dashboard = () => {
                   phone: "",
                   company: "",
                   status: "New",
+                  assignedTo: "",
                 });
                 setIsAddModalOpen(true);
               }}
@@ -226,7 +253,6 @@ const Dashboard = () => {
               ➕ Add Customer
             </button>
 
-            {/* Export CSV Button */}
             <button
               onClick={() => exportLeadsToCSV(filteredCustomers)}
               className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl font-medium shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-1.5 text-xs"
@@ -234,7 +260,6 @@ const Dashboard = () => {
               📊 Export CSV
             </button>
 
-            {/* Logout Button */}
             <button
               onClick={handleLogout}
               className="bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 px-3.5 py-2 rounded-xl font-medium transition-all flex items-center gap-1.5 text-xs"
@@ -358,7 +383,7 @@ const Dashboard = () => {
                         onChange={(e) =>
                           handleStatusChange(item._id, e.target.value)
                         }
-                        className="text-xs font-bold px-3 py-1.5 rounded-full border bg-slate-900 text-slate-200 border-slate-700"
+                        className="text-xs font-bold px-3 py-1.5 rounded-full border bg-slate-900 text-slate-200 border-slate-700 cursor-pointer"
                       >
                         <option value="New">New</option>
                         <option value="Contacted">Contacted</option>
@@ -367,7 +392,16 @@ const Dashboard = () => {
                       </select>
                     </td>
                     <td className="py-4 px-6 text-slate-300">
-                      {item.assignedTo?.name || "Unassigned"}
+                      {item.assignedTo?.name ? (
+                        <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                          {item.assignedTo.name}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 italic">
+                          Unassigned
+                        </span>
+                      )}
                     </td>
                     <td className="py-4 px-6 flex items-center gap-2">
                       <button
@@ -485,6 +519,24 @@ const Dashboard = () => {
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none mt-1"
                 />
               </div>
+              <div>
+                <label className="text-xs text-slate-400 uppercase font-semibold">
+                  Status
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) =>
+                    setFormData({ ...formData, status: e.target.value })
+                  }
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none mt-1"
+                >
+                  <option value="New">New</option>
+                  <option value="Contacted">Contacted</option>
+                  <option value="Qualified">Qualified</option>
+                  <option value="Closed">Closed</option>
+                </select>
+              </div>
+
               <div className="flex justify-end gap-3 mt-6">
                 <button
                   type="button"
