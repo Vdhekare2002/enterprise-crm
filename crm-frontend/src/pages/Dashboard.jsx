@@ -32,10 +32,14 @@ const Dashboard = () => {
     assignedTo: "",
   });
 
-  // Helper function: ID ko saf-suthrani (clean) karne ke liye
-  const cleanObjectId = (rawId) => {
+  // Strict Sanitizer: Remove any trailing colons, :1, spaces or special characters
+  const getCleanId = (rawId) => {
     if (!rawId) return "";
-    return String(rawId).replace(/:1/g, "").split(":")[0].trim();
+    const str = String(rawId);
+    return str
+      .split(":")[0]
+      .replace(/[^a-fA-F0-9]/g, "")
+      .trim();
   };
 
   useEffect(() => {
@@ -71,17 +75,19 @@ const Dashboard = () => {
     fetchCustomers();
   }, []);
 
-  // Quick Status Change (Clean ID Fix)
+  // 1. Quick Status Change Handler
   const handleStatusChange = async (rawCustomerId, newStatus) => {
     try {
-      const cleanId = cleanObjectId(rawCustomerId);
+      const cleanId = getCleanId(rawCustomerId);
+      if (!cleanId) return alert("Invalid Customer ID");
+
       const res = await API.patch(`/customers/${cleanId}`, {
         status: newStatus,
       });
 
       setCustomers((prev) =>
         prev.map((item) =>
-          cleanObjectId(item._id) === cleanId
+          getCleanId(item._id) === cleanId
             ? {
                 ...item,
                 status: newStatus,
@@ -96,7 +102,7 @@ const Dashboard = () => {
     }
   };
 
-  // Add Customer Submit
+  // 2. Add New Customer Handler
   const handleAddCustomerSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -129,11 +135,14 @@ const Dashboard = () => {
     }
   };
 
-  // Edit Customer Submit (Clean ID Fix)
+  // 3. Edit Customer Handler
   const handleEditCustomerSubmit = async (e) => {
     e.preventDefault();
+    if (!editCustomer) return;
+
     try {
-      const cleanId = cleanObjectId(editCustomer._id);
+      const cleanId = getCleanId(editCustomer._id);
+      if (!cleanId) return alert("Invalid Customer Selection");
 
       const payload = {
         name: formData.name.trim(),
@@ -151,7 +160,7 @@ const Dashboard = () => {
 
       setCustomers((prev) =>
         prev.map((item) =>
-          cleanObjectId(item._id) === cleanId
+          getCleanId(item._id) === cleanId
             ? {
                 ...res.data.data,
                 assignedTo: res.data.data?.assignedTo || item.assignedTo,
@@ -159,24 +168,27 @@ const Dashboard = () => {
             : item,
         ),
       );
+
       setIsEditModalOpen(false);
       setEditCustomer(null);
-      alert("Customer updated successfully!");
+      alert("Customer details updated successfully!");
     } catch (error) {
       console.error("Edit error:", error);
-      alert(error.response?.data?.message || "Failed to update customer");
+      alert(
+        error.response?.data?.message || "Failed to update customer details",
+      );
     }
   };
 
-  // Delete Customer
+  // 4. Delete Customer Handler
   const handleDeleteCustomer = async (id) => {
     if (!window.confirm("Are you sure you want to delete this customer?"))
       return;
     try {
-      const cleanId = cleanObjectId(id);
+      const cleanId = getCleanId(id);
       await API.delete(`/customers/${cleanId}`);
       setCustomers((prev) =>
-        prev.filter((item) => cleanObjectId(item._id) !== cleanId),
+        prev.filter((item) => getCleanId(item._id) !== cleanId),
       );
     } catch (error) {
       alert("Failed to delete customer");
@@ -184,7 +196,7 @@ const Dashboard = () => {
   };
 
   const openEditModal = (customer) => {
-    const cleanId = cleanObjectId(customer._id);
+    const cleanId = getCleanId(customer._id);
     setEditCustomer({ ...customer, _id: cleanId });
     setFormData({
       name: customer.name || "",
@@ -207,11 +219,10 @@ const Dashboard = () => {
 
     const matchesStatus =
       statusFilter === "All" || item.status === statusFilter;
-
     return matchesSearch && matchesStatus;
   });
 
-  // Pagination Logic
+  // Pagination
   const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage) || 1;
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -220,7 +231,7 @@ const Dashboard = () => {
     indexOfLastItem,
   );
 
-  // KPI Calculations
+  // Stats
   const totalCount = customers.length;
   const newCount = customers.filter((c) => c.status === "New").length;
   const contactedCount = customers.filter(
@@ -248,9 +259,8 @@ const Dashboard = () => {
           </p>
         </div>
 
-        {/* Right Header: Profile + Action Buttons */}
+        {/* User Badge & Actions */}
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
-          {/* User Badge */}
           <div className="flex items-center gap-3 bg-slate-800/90 border border-slate-700/80 px-3.5 py-2 rounded-2xl shadow-md">
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 text-white flex items-center justify-center font-bold text-sm">
               {currentUser?.name
@@ -280,21 +290,19 @@ const Dashboard = () => {
                 });
                 setIsAddModalOpen(true);
               }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl font-medium shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-1.5 text-xs"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl font-medium shadow-lg shadow-indigo-600/20 transition-all text-xs"
             >
               ➕ Add Customer
             </button>
-
             <button
               onClick={() => exportLeadsToCSV(filteredCustomers)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl font-medium shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-1.5 text-xs"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl font-medium shadow-lg shadow-emerald-600/20 transition-all text-xs"
             >
               📊 Export CSV
             </button>
-
             <button
               onClick={handleLogout}
-              className="bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 px-3.5 py-2 rounded-xl font-medium transition-all flex items-center gap-1.5 text-xs"
+              className="bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 px-3.5 py-2 rounded-xl font-medium transition-all text-xs"
             >
               🚪 Logout
             </button>
@@ -336,11 +344,11 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Filter Bar */}
+      {/* Control Bar */}
       <div className="bg-slate-800/80 border border-slate-700 p-4 rounded-2xl shadow-lg mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
         <input
           type="text"
-          placeholder="Search by customer name, email, phone, or company..."
+          placeholder="Search customer by name, email, phone, or company..."
           value={searchTerm}
           onChange={(e) => {
             setSearchTerm(e.target.value);
@@ -348,7 +356,6 @@ const Dashboard = () => {
           }}
           className="w-full md:w-1/2 px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:border-indigo-500"
         />
-
         <div className="flex items-center gap-3 w-full md:w-auto">
           <span className="text-slate-400 font-medium text-xs uppercase">
             Status:
@@ -370,7 +377,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Main Table */}
+      {/* Table */}
       <div className="bg-slate-800/50 border border-slate-700/80 rounded-2xl shadow-xl overflow-hidden">
         {loading ? (
           <div className="p-16 text-center text-slate-400 font-medium">
@@ -378,7 +385,7 @@ const Dashboard = () => {
           </div>
         ) : currentCustomers.length === 0 ? (
           <div className="p-16 text-center text-slate-400">
-            No customers match your search criteria.
+            No customers found.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -456,7 +463,7 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Pagination Footer */}
+        {/* Pagination */}
         <div className="p-4 border-t border-slate-700/80 bg-slate-900/40 flex justify-between items-center text-xs text-slate-400">
           <div>
             Page {currentPage} of {totalPages} ({filteredCustomers.length}{" "}
@@ -465,14 +472,14 @@ const Dashboard = () => {
           <div className="flex gap-2">
             <button
               disabled={currentPage === 1}
-              onClick={() => setCurrentPage((prev) => prev - 1)}
+              onClick={() => setCurrentPage((p) => p - 1)}
               className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 disabled:opacity-50"
             >
               Previous
             </button>
             <button
               disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((prev) => prev + 1)}
+              onClick={() => setCurrentPage((p) => p + 1)}
               className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 disabled:opacity-50"
             >
               Next
@@ -481,7 +488,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Add / Edit Customer Modal */}
+      {/* Modal */}
       {(isAddModalOpen || isEditModalOpen) && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-slate-800 border border-slate-700 w-full max-w-md rounded-2xl p-6 shadow-2xl">
