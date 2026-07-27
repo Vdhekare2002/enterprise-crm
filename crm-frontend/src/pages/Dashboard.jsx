@@ -65,7 +65,7 @@ const Dashboard = () => {
     fetchCustomers();
   }, []);
 
-  // Quick Status Change
+  // Quick Status Change (Clean ID)
   const handleStatusChange = async (customerId, newStatus) => {
     try {
       const cleanId = String(customerId).split(":")[0].trim();
@@ -75,7 +75,7 @@ const Dashboard = () => {
 
       setCustomers((prev) =>
         prev.map((item) =>
-          item._id === customerId
+          String(item._id).split(":")[0].trim() === cleanId
             ? {
                 ...item,
                 status: newStatus,
@@ -95,9 +95,17 @@ const Dashboard = () => {
     e.preventDefault();
     try {
       const payload = {
-        ...formData,
-        assignedTo: formData.assignedTo || null,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        company: formData.company,
+        status: formData.status,
       };
+
+      if (formData.assignedTo && formData.assignedTo.trim() !== "") {
+        payload.assignedTo = formData.assignedTo;
+      }
+
       const res = await API.post("/customers", payload);
       setCustomers([res.data.data, ...customers]);
       setIsAddModalOpen(false);
@@ -109,30 +117,45 @@ const Dashboard = () => {
         status: "New",
         assignedTo: "",
       });
+      alert("Customer created successfully!");
     } catch (error) {
       alert(error.response?.data?.message || "Failed to add customer");
     }
   };
 
-  // 🔥 Single Clean Declaration of Edit Customer Submit
+  // Edit Customer Submit (Clean ID & Payload)
   const handleEditCustomerSubmit = async (e) => {
     e.preventDefault();
     try {
       const cleanId = String(editCustomer._id).split(":")[0].trim();
+
       const payload = {
-        ...formData,
-        assignedTo: formData.assignedTo || null,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        company: formData.company,
+        status: formData.status,
       };
+
+      if (formData.assignedTo && formData.assignedTo.trim() !== "") {
+        payload.assignedTo = formData.assignedTo;
+      }
 
       const res = await API.patch(`/customers/${cleanId}`, payload);
 
       setCustomers((prev) =>
         prev.map((item) =>
-          item._id === editCustomer._id ? res.data.data : item,
+          String(item._id).split(":")[0].trim() === cleanId
+            ? {
+                ...res.data.data,
+                assignedTo: res.data.data?.assignedTo || item.assignedTo,
+              }
+            : item,
         ),
       );
       setIsEditModalOpen(false);
       setEditCustomer(null);
+      alert("Customer updated successfully!");
     } catch (error) {
       console.error("Edit error:", error);
       alert(error.response?.data?.message || "Failed to update customer");
@@ -146,14 +169,19 @@ const Dashboard = () => {
     try {
       const cleanId = String(id).split(":")[0].trim();
       await API.delete(`/customers/${cleanId}`);
-      setCustomers((prev) => prev.filter((item) => item._id !== id));
+      setCustomers((prev) =>
+        prev.filter(
+          (item) => String(item._id).split(":")[0].trim() !== cleanId,
+        ),
+      );
     } catch (error) {
       alert("Failed to delete customer");
     }
   };
 
   const openEditModal = (customer) => {
-    setEditCustomer(customer);
+    const cleanId = String(customer._id).split(":")[0].trim();
+    setEditCustomer({ ...customer, _id: cleanId });
     setFormData({
       name: customer.name || "",
       email: customer.email || "",
