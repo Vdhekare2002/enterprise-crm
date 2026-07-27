@@ -163,12 +163,13 @@ app.post("/api/v1/auth/login", async (req, res) => {
 });
 
 // --- CUSTOMER / LEADS ROUTES ---
+
+// GET All Customers (Sorted by newest first)
 app.get("/api/v1/customers", protect, async (req, res) => {
   try {
-    const customers = await Customer.find().populate(
-      "assignedTo",
-      "name email",
-    );
+    const customers = await Customer.find()
+      .populate("assignedTo", "name email")
+      .sort({ createdAt: -1 });
     res
       .status(200)
       .json({ success: true, count: customers.length, data: customers });
@@ -177,6 +178,7 @@ app.get("/api/v1/customers", protect, async (req, res) => {
   }
 });
 
+// CREATE Customer
 app.post("/api/v1/customers", protect, async (req, res) => {
   try {
     const { name, email, phone, company, status, assignedTo } = req.body;
@@ -200,11 +202,9 @@ app.post("/api/v1/customers", protect, async (req, res) => {
   }
 });
 
-// 🔥 UPDATE CUSTOMER STATUS ROUTE (PATCH)
+// UPDATE CUSTOMER (PATCH/PUT)
 app.patch("/api/v1/customers/:id", protect, async (req, res) => {
   try {
-    const { status, name, email, phone, company, assignedTo } = req.body;
-
     const updatedCustomer = await Customer.findByIdAndUpdate(
       req.params.id,
       { $set: req.body },
@@ -222,6 +222,23 @@ app.patch("/api/v1/customers/:id", protect, async (req, res) => {
       message: "Customer updated successfully!",
       data: updatedCustomer,
     });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 🔥 DELETE CUSTOMER ROUTE
+app.delete("/api/v1/customers/:id", protect, async (req, res) => {
+  try {
+    const deletedCustomer = await Customer.findByIdAndDelete(req.params.id);
+    if (!deletedCustomer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Customer not found" });
+    }
+    res
+      .status(200)
+      .json({ success: true, message: "Customer deleted successfully!" });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
