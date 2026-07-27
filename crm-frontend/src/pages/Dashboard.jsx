@@ -1,12 +1,24 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom"; // Redirect ke liye
 import API from "../api/axiosInstance";
 import { exportLeadsToCSV } from "../utils/exportToCSV";
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+
+  // 1. Logout Handler Function
+  const handleLogout = () => {
+    // LocalStorage se Auth Data clear karein
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    // Login page par redirect karein
+    navigate("/login");
+  };
 
   const fetchCustomers = async () => {
     try {
@@ -50,7 +62,7 @@ const Dashboard = () => {
     return matchesSearch && matchesStatus;
   });
 
-  // Calculate Metrics for KPI Cards
+  // KPI Calculations
   const totalCount = customers.length;
   const newCount = customers.filter((c) => c.status === "New").length;
   const contactedCount = customers.filter(
@@ -78,10 +90,11 @@ const Dashboard = () => {
           </p>
         </div>
 
+        {/* Action Buttons: Export & Logout */}
         <div className="flex items-center gap-3">
           <button
             onClick={() => exportLeadsToCSV(filteredCustomers)}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-medium shadow-lg shadow-emerald-500/20 transition-all active:scale-95 flex items-center gap-2 text-sm"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-medium shadow-lg shadow-emerald-600/20 transition-all active:scale-95 flex items-center gap-2 text-sm"
           >
             <svg
               className="w-4 h-4"
@@ -97,6 +110,27 @@ const Dashboard = () => {
               />
             </svg>
             Export CSV
+          </button>
+
+          {/* 🔥 Logout Button */}
+          <button
+            onClick={handleLogout}
+            className="bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 px-4 py-2.5 rounded-xl font-medium transition-all active:scale-95 flex items-center gap-2 text-sm"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
+            </svg>
+            Logout
           </button>
         </div>
       </div>
