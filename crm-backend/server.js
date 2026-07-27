@@ -7,7 +7,15 @@ require("dotenv").config();
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+
+// Enable CORS for all methods and headers
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
 
 // ================= 1. DATABASE CONNECTION =================
 const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/crm_db";
@@ -80,7 +88,6 @@ const protect = (req, res, next) => {
 
 // ================= 4. API ENDPOINTS =================
 
-// Test Route
 app.get("/", (req, res) =>
   res.send("🚀 CRM Master API is Running Flawlessly!"),
 );
@@ -191,7 +198,7 @@ app.post("/api/v1/customers", protect, async (req, res) => {
       phone,
       company,
       status: status || "New",
-      assignedTo,
+      assignedTo: assignedTo && assignedTo.trim() !== "" ? assignedTo : null,
     });
 
     res
@@ -202,12 +209,25 @@ app.post("/api/v1/customers", protect, async (req, res) => {
   }
 });
 
-// UPDATE CUSTOMER (PATCH/PUT)
+// UPDATE CUSTOMER (PATCH/PUT) - Clean ID & Null Check
 app.patch("/api/v1/customers/:id", protect, async (req, res) => {
   try {
+    const customerId = req.params.id.split(":")[0].trim();
+
+    if (!mongoose.Types.ObjectId.isValid(customerId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Customer ID" });
+    }
+
+    const updateData = { ...req.body };
+    if (!updateData.assignedTo || updateData.assignedTo.trim() === "") {
+      delete updateData.assignedTo;
+    }
+
     const updatedCustomer = await Customer.findByIdAndUpdate(
-      req.params.id,
-      { $set: req.body },
+      customerId,
+      { $set: updateData },
       { new: true, runValidators: true },
     ).populate("assignedTo", "name email");
 
@@ -227,10 +247,11 @@ app.patch("/api/v1/customers/:id", protect, async (req, res) => {
   }
 });
 
-// 🔥 DELETE CUSTOMER ROUTE
+// DELETE CUSTOMER ROUTE
 app.delete("/api/v1/customers/:id", protect, async (req, res) => {
   try {
-    const deletedCustomer = await Customer.findByIdAndDelete(req.params.id);
+    const customerId = req.params.id.split(":")[0].trim();
+    const deletedCustomer = await Customer.findByIdAndDelete(customerId);
     if (!deletedCustomer) {
       return res
         .status(404)
