@@ -8,7 +8,7 @@ require("dotenv").config();
 const app = express();
 app.use(express.json());
 
-// Enable CORS for all methods and headers
+// Absolute CORS Permissions
 app.use(
   cors({
     origin: "*",
@@ -17,7 +17,7 @@ app.use(
   }),
 );
 
-// ================= 1. DATABASE CONNECTION =================
+// DB Connection
 const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/crm_db";
 mongoose
   .connect(MONGO_URI)
@@ -26,7 +26,7 @@ mongoose
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret123";
 
-// ================= 2. MONGOOSE MODELS =================
+// Models
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
@@ -61,7 +61,7 @@ const customerSchema = new mongoose.Schema(
 const User = mongoose.model("User", userSchema);
 const Customer = mongoose.model("Customer", customerSchema);
 
-// ================= 3. AUTH MIDDLEWARE =================
+// Protect Middleware
 const protect = (req, res, next) => {
   let token;
   if (
@@ -86,20 +86,14 @@ const protect = (req, res, next) => {
   }
 };
 
-// ================= 4. API ENDPOINTS =================
+// Routes
+app.get("/", (req, res) => res.send("🚀 CRM API Running!"));
 
-app.get("/", (req, res) =>
-  res.send("🚀 CRM Master API is Running Flawlessly!"),
-);
-
-// --- AUTH ROUTES ---
 app.post("/api/v1/auth/signup", async (req, res) => {
   try {
     const { name, email, password, role, phone } = req.body;
     if (!name || !email || !password)
-      return res
-        .status(400)
-        .json({ message: "Name, Email & Password required" });
+      return res.status(400).json({ message: "Fields required" });
 
     const cleanEmail = email.toLowerCase().trim();
     const exists = await User.findOne({ email: cleanEmail });
@@ -113,22 +107,22 @@ app.post("/api/v1/auth/signup", async (req, res) => {
       role: role || "superadmin",
       phone,
     });
-
     const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, {
       expiresIn: "30d",
     });
 
-    res.status(201).json({
-      success: true,
-      message: "Registered!",
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    });
+    res
+      .status(201)
+      .json({
+        success: true,
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+      });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -137,9 +131,8 @@ app.post("/api/v1/auth/signup", async (req, res) => {
 app.post("/api/v1/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
+    if (!email || !password)
       return res.status(400).json({ message: "Email and password required" });
-    }
 
     const cleanEmail = email.toLowerCase().trim();
     const user = await User.findOne({ email: cleanEmail });
@@ -152,26 +145,23 @@ app.post("/api/v1/auth/login", async (req, res) => {
     const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, {
       expiresIn: "30d",
     });
-
-    res.status(200).json({
-      success: true,
-      message: "Logged in!",
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    });
+    res
+      .status(200)
+      .json({
+        success: true,
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+      });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// --- CUSTOMER / LEADS ROUTES ---
-
-// GET All Customers (Sorted by newest first)
 app.get("/api/v1/customers", protect, async (req, res) => {
   try {
     const customers = await Customer.find()
@@ -185,7 +175,6 @@ app.get("/api/v1/customers", protect, async (req, res) => {
   }
 });
 
-// CREATE Customer
 app.post("/api/v1/customers", protect, async (req, res) => {
   try {
     const { name, email, phone, company, status, assignedTo } = req.body;
@@ -198,7 +187,10 @@ app.post("/api/v1/customers", protect, async (req, res) => {
       phone,
       company,
       status: status || "New",
-      assignedTo: assignedTo && assignedTo.trim() !== "" ? assignedTo : null,
+      assignedTo:
+        assignedTo && mongoose.Types.ObjectId.isValid(assignedTo)
+          ? assignedTo
+          : null,
     });
 
     res
@@ -209,24 +201,30 @@ app.post("/api/v1/customers", protect, async (req, res) => {
   }
 });
 
-// UPDATE CUSTOMER (PATCH/PUT) - Clean ID & Null Check
+// Clean ObjectId Patch Route
 app.patch("/api/v1/customers/:id", protect, async (req, res) => {
   try {
-    const customerId = req.params.id.split(":")[0].trim();
+    const cleanId = String(req.params.id)
+      .split(":")[0]
+      .replace(/[^a-fA-F0-9]/g, "")
+      .trim();
 
-    if (!mongoose.Types.ObjectId.isValid(customerId)) {
+    if (!mongoose.Types.ObjectId.isValid(cleanId)) {
       return res
         .status(400)
-        .json({ success: false, message: "Invalid Customer ID" });
+        .json({ success: false, message: "Invalid MongoDB Customer ID" });
     }
 
     const updateData = { ...req.body };
-    if (!updateData.assignedTo || updateData.assignedTo.trim() === "") {
+    if (
+      !updateData.assignedTo ||
+      !mongoose.Types.ObjectId.isValid(updateData.assignedTo)
+    ) {
       delete updateData.assignedTo;
     }
 
     const updatedCustomer = await Customer.findByIdAndUpdate(
-      customerId,
+      cleanId,
       { $set: updateData },
       { new: true, runValidators: true },
     ).populate("assignedTo", "name email");
@@ -234,29 +232,37 @@ app.patch("/api/v1/customers/:id", protect, async (req, res) => {
     if (!updatedCustomer) {
       return res
         .status(404)
-        .json({ success: false, message: "Customer not found" });
+        .json({ success: false, message: "Customer record not found" });
     }
 
-    res.status(200).json({
-      success: true,
-      message: "Customer updated successfully!",
-      data: updatedCustomer,
-    });
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "Updated successfully!",
+        data: updatedCustomer,
+      });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// DELETE CUSTOMER ROUTE
 app.delete("/api/v1/customers/:id", protect, async (req, res) => {
   try {
-    const customerId = req.params.id.split(":")[0].trim();
-    const deletedCustomer = await Customer.findByIdAndDelete(customerId);
-    if (!deletedCustomer) {
+    const cleanId = String(req.params.id)
+      .split(":")[0]
+      .replace(/[^a-fA-F0-9]/g, "")
+      .trim();
+    if (!mongoose.Types.ObjectId.isValid(cleanId)) {
+      return res.status(400).json({ success: false, message: "Invalid ID" });
+    }
+
+    const deletedCustomer = await Customer.findByIdAndDelete(cleanId);
+    if (!deletedCustomer)
       return res
         .status(404)
         .json({ success: false, message: "Customer not found" });
-    }
+
     res
       .status(200)
       .json({ success: true, message: "Customer deleted successfully!" });
@@ -265,19 +271,5 @@ app.delete("/api/v1/customers/:id", protect, async (req, res) => {
   }
 });
 
-// --- DASHBOARD ROUTE ---
-app.get("/api/v1/dashboard/stats", protect, async (req, res) => {
-  try {
-    const totalCustomers = await Customer.countDocuments();
-    const totalTelecallers = await User.countDocuments({ role: "telecaller" });
-    res
-      .status(200)
-      .json({ success: true, data: { totalCustomers, totalTelecallers } });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// ================= 5. START SERVER =================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Master Server running on port ${PORT}`));
