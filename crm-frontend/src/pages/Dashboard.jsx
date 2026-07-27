@@ -32,6 +32,12 @@ const Dashboard = () => {
     assignedTo: "",
   });
 
+  // Helper function: ID ko saf-suthrani (clean) karne ke liye
+  const cleanObjectId = (rawId) => {
+    if (!rawId) return "";
+    return String(rawId).replace(/:1/g, "").split(":")[0].trim();
+  };
+
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
     if (savedUser) {
@@ -65,17 +71,17 @@ const Dashboard = () => {
     fetchCustomers();
   }, []);
 
-  // Quick Status Change (Clean ID)
-  const handleStatusChange = async (customerId, newStatus) => {
+  // Quick Status Change (Clean ID Fix)
+  const handleStatusChange = async (rawCustomerId, newStatus) => {
     try {
-      const cleanId = String(customerId).split(":")[0].trim();
+      const cleanId = cleanObjectId(rawCustomerId);
       const res = await API.patch(`/customers/${cleanId}`, {
         status: newStatus,
       });
 
       setCustomers((prev) =>
         prev.map((item) =>
-          String(item._id).split(":")[0].trim() === cleanId
+          cleanObjectId(item._id) === cleanId
             ? {
                 ...item,
                 status: newStatus,
@@ -95,15 +101,15 @@ const Dashboard = () => {
     e.preventDefault();
     try {
       const payload = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        company: formData.company,
-        status: formData.status,
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        company: formData.company ? formData.company.trim() : "",
+        status: formData.status || "New",
       };
 
       if (formData.assignedTo && formData.assignedTo.trim() !== "") {
-        payload.assignedTo = formData.assignedTo;
+        payload.assignedTo = formData.assignedTo.trim();
       }
 
       const res = await API.post("/customers", payload);
@@ -123,29 +129,29 @@ const Dashboard = () => {
     }
   };
 
-  // Edit Customer Submit (Clean ID & Payload)
+  // Edit Customer Submit (Clean ID Fix)
   const handleEditCustomerSubmit = async (e) => {
     e.preventDefault();
     try {
-      const cleanId = String(editCustomer._id).split(":")[0].trim();
+      const cleanId = cleanObjectId(editCustomer._id);
 
       const payload = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        company: formData.company,
-        status: formData.status,
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        company: formData.company ? formData.company.trim() : "",
+        status: formData.status || "New",
       };
 
       if (formData.assignedTo && formData.assignedTo.trim() !== "") {
-        payload.assignedTo = formData.assignedTo;
+        payload.assignedTo = formData.assignedTo.trim();
       }
 
       const res = await API.patch(`/customers/${cleanId}`, payload);
 
       setCustomers((prev) =>
         prev.map((item) =>
-          String(item._id).split(":")[0].trim() === cleanId
+          cleanObjectId(item._id) === cleanId
             ? {
                 ...res.data.data,
                 assignedTo: res.data.data?.assignedTo || item.assignedTo,
@@ -167,12 +173,10 @@ const Dashboard = () => {
     if (!window.confirm("Are you sure you want to delete this customer?"))
       return;
     try {
-      const cleanId = String(id).split(":")[0].trim();
+      const cleanId = cleanObjectId(id);
       await API.delete(`/customers/${cleanId}`);
       setCustomers((prev) =>
-        prev.filter(
-          (item) => String(item._id).split(":")[0].trim() !== cleanId,
-        ),
+        prev.filter((item) => cleanObjectId(item._id) !== cleanId),
       );
     } catch (error) {
       alert("Failed to delete customer");
@@ -180,7 +184,7 @@ const Dashboard = () => {
   };
 
   const openEditModal = (customer) => {
-    const cleanId = String(customer._id).split(":")[0].trim();
+    const cleanId = cleanObjectId(customer._id);
     setEditCustomer({ ...customer, _id: cleanId });
     setFormData({
       name: customer.name || "",
