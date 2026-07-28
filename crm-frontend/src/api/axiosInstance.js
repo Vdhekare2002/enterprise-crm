@@ -3,6 +3,9 @@ import axios from "axios";
 const API = axios.create({
   // Direct Live Render URL
   baseURL: "https://crm-backend-api-f15i.onrender.com/api/v1",
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
 // Request interceptor to attach JWT token

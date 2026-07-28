@@ -136,6 +136,7 @@ const Dashboard = () => {
   };
 
   // 3. Edit Customer Handler
+  // Dashboard.jsx
   const handleEditCustomerSubmit = async (e) => {
     e.preventDefault();
     if (!editCustomer) return;
@@ -144,39 +145,30 @@ const Dashboard = () => {
       const cleanId = getCleanId(editCustomer._id);
       if (!cleanId) return alert("Invalid Customer Selection");
 
+      // 🔍 Line 176 se pehle yeh Debug Logs lagayein:
+      console.log("Clean ID:", cleanId);
+      console.log(
+        "Full Request URL:",
+        `${API.defaults.baseURL}/customers/${cleanId}`,
+      );
+
       const payload = {
         name: formData.name.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim(),
         company: formData.company ? formData.company.trim() : "",
         status: formData.status || "New",
+        assignedTo: formData.assignedTo
+          ? formData.assignedTo.trim()
+          : undefined,
       };
 
-      if (formData.assignedTo && formData.assignedTo.trim() !== "") {
-        payload.assignedTo = formData.assignedTo.trim();
-      }
+      // Line 176
+      const res = await API.put(`/customers/${cleanId}`, payload);
 
-      const res = await API.patch(`/customers/${cleanId}`, payload);
-
-      setCustomers((prev) =>
-        prev.map((item) =>
-          getCleanId(item._id) === cleanId
-            ? {
-                ...res.data.data,
-                assignedTo: res.data.data?.assignedTo || item.assignedTo,
-              }
-            : item,
-        ),
-      );
-
-      setIsEditModalOpen(false);
-      setEditCustomer(null);
-      alert("Customer details updated successfully!");
+      // ... baki ka state update code
     } catch (error) {
       console.error("Edit error:", error);
-      alert(
-        error.response?.data?.message || "Failed to update customer details",
-      );
     }
   };
 
